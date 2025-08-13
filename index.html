@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專業螢幕錄影工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        
+        .recording-pulse {
+            animation: pulse 1.5s ease-in-out infinite alternate;
+        }
+        
+        @keyframes pulse {
+            from { opacity: 1; }
+            to { opacity: 0.5; }
+        }
+        
+        .countdown {
+            animation: countdown 1s ease-in-out;
+        }
+        
+        @keyframes countdown {
+            0% { transform: scale(1.5); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+
+
+        .recording-timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 10001;
+            border: 2px solid #ef4444;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .recording-timer::before {
+            content: '🔴';
+            margin-right: 8px;
+            animation: pulse 1s ease-in-out infinite alternate;
+        }
+
+        .video-preview {
+            max-width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10002;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body class="bg-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">🎬 專業螢幕錄影工具</h1>
+            <p class="text-gray-600">"專業螢幕錄影工具" 造福 Windows 和 MacOS 使用者</p>
+            <a class="text-gray-600" href="https://github.com/i-like-dev/video123">Github</a>
+        </div>
+
+        <!-- Main Control Panel -->
+        <div class="max-w-4xl mx-auto bg-gray-50 rounded-2xl p-8 shadow-lg border border-gray-200">
+            <!-- Status Display -->
+            <div class="text-center mb-8">
+                <div id="statusDisplay" class="inline-flex items-center px-6 py-3 rounded-full bg-white text-gray-800 border border-gray-300 shadow-sm">
+                    <div class="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
+                    <span id="statusText">準備就緒</span>
+                </div>
+                <div id="countdown" class="text-6xl font-bold text-gray-800 mt-4 hidden"></div>
+                <div id="timer" class="text-2xl font-mono text-blue-600 mt-2 hidden">00:00</div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Screen Recording -->
+                <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div class="text-center mb-4">
+                        <div class="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <span class="text-2xl">🎥</span>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800">螢幕錄影</h3>
+                    </div>
+                    <button id="recordBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105">
+                        開始錄影
+                    </button>
+                </div>
+
+                <!-- Screenshot -->
+                <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div class="text-center mb-4">
+                        <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <span class="text-2xl">📸</span>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800">螢幕截圖</h3>
+                    </div>
+                    <button id="screenshotBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105">
+                        立即截圖
+                    </button>
+                </div>
+
+                <!-- Settings -->
+                <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div class="text-center mb-4">
+                        <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <span class="text-2xl">⚙️</span>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800">錄影設定</h3>
+                    </div>
+                    <select id="qualitySelect" class="w-full bg-white border border-gray-300 text-gray-800 rounded-lg px-4 py-2 mb-3">
+                        <option value="1080p">1080p (推薦)</option>
+                        <option value="720p">720p</option>
+                        <option value="4K">4K</option>
+                    </select>
+                    <label class="flex items-center text-gray-800 mb-2">
+                        <input type="checkbox" id="audioToggle" class="mr-2" checked>
+                        <span>包含音訊</span>
+                    </label>
+                    <label class="flex items-center text-gray-800">
+                        <input type="checkbox" id="showTimerToggle" class="mr-2" checked>
+                        <span>顯示錄影計時器</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Media Gallery -->
+            <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <span class="mr-2">🎞️</span>
+                    媒體庫
+                </h3>
+                <div id="mediaGallery" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="text-gray-400 text-center py-8 col-span-full">
+                        尚無錄影或截圖檔案
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="max-w-2xl mx-auto mt-8 bg-gray-50 rounded-xl p-6 border border-gray-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">📋 使用說明</h3>
+            <ul class="text-gray-600 space-y-2">
+                <li>• 點擊「開始錄影」選擇要分享的螢幕或視窗</li>
+                <li>• 選擇完成後會有3秒倒數，然後開始錄影</li>
+                <li>• 錄影時右上角會顯示計時器</li>
+                <li>• 支援MP4格式輸出，可線上預覽</li>
+                <li>• 所有檔案儲存在媒體庫，可手動下載</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Recording Timer (Hidden by default) -->
+    <div id="recordingTimer" class="recording-timer hidden">00:00</div>
+
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordingStartTime;
+        let timerInterval;
+        let selectedArea = null;
+        let isSelecting = false;
+
+        const recordBtn = document.getElementById('recordBtn');
+        const fullScreenBtn = document.getElementById('fullScreenBtn');
+        const screenshotBtn = document.getElementById('screenshotBtn');
+        const fullScreenshotBtn = document.getElementById('fullScreenshotBtn');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const statusText = document.getElementById('statusText');
+        const countdown = document.getElementById('countdown');
+        const timer = document.getElementById('timer');
+        const recordingTimer = document.getElementById('recordingTimer');
+        const mediaGallery = document.getElementById('mediaGallery');
+        const qualitySelect = document.getElementById('qualitySelect');
+        const audioToggle = document.getElementById('audioToggle');
+        const showTimerToggle = document.getElementById('showTimerToggle');
+
+        // Update status display
+        function updateStatus(text, color = 'green') {
+            statusText.textContent = text;
+            const dot = statusDisplay.querySelector('div');
+            dot.className = `w-3 h-3 rounded-full mr-3 bg-${color}-400`;
+            if (color === 'red') {
+                dot.classList.add('recording-pulse');
+            } else {
+                dot.classList.remove('recording-pulse');
+            }
+        }
+
+        // Start screen selection and countdown
+        async function startScreenSelection() {
+            try {
+                updateStatus('請選擇要分享的螢幕...', 'yellow');
+                
+                // Request screen access first
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        mediaSource: 'screen',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: audioToggle.checked
+                });
+
+                // Store the stream for later use
+                window.selectedStream = stream;
+                
+                // Start countdown after selection
+                startCountdown();
+                
+            } catch (err) {
+                console.error('選擇螢幕失敗:', err);
+                updateStatus('選擇螢幕失敗', 'red');
+                setTimeout(() => updateStatus('準備就緒'), 3000);
+                isRecording = false;
+            }
+        }
+
+        // Start countdown
+        function startCountdown() {
+            let count = 3;
+            countdown.classList.remove('hidden');
+            countdown.textContent = count;
+            countdown.classList.add('countdown');
+            updateStatus('準備錄影...', 'yellow');
+            
+            const countInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdown.textContent = count;
+                    countdown.classList.remove('countdown');
+                    setTimeout(() => countdown.classList.add('countdown'), 10);
+                } else {
+                    countdown.textContent = '開始！';
+                    setTimeout(() => {
+                        countdown.classList.add('hidden');
+                        startActualRecording();
+                    }, 1000);
+                    clearInterval(countInterval);
+                }
+            }, 1000);
+        }
+
+        // Start actual recording
+        async function startActualRecording() {
+            try {
+                // Use the previously selected stream
+                const stream = window.selectedStream;
+                
+                if (!stream) {
+                    throw new Error('沒有選擇的螢幕');
+                }
+
+                recordedChunks = [];
+                
+                // Use MediaRecorder with MP4 support
+                const options = { mimeType: 'video/webm;codecs=vp9' };
+                if (MediaRecorder.isTypeSupported('video/mp4')) {
+                    options.mimeType = 'video/mp4';
+                }
+                
+                mediaRecorder = new MediaRecorder(stream, options);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { 
+                        type: options.mimeType.includes('mp4') ? 'video/mp4' : 'video/webm' 
+                    });
+                    const extension = options.mimeType.includes('mp4') ? 'mp4' : 'webm';
+                    const filename = `screen-recording-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${extension}`;
+                    
+                    // Add to gallery only (no auto download)
+                    addVideoToGallery(blob, filename);
+                    stream.getTracks().forEach(track => track.stop());
+                    window.selectedStream = null;
+                };
+
+                mediaRecorder.start();
+                recordingStartTime = Date.now();
+                startTimer();
+                updateStatus('錄影中...', 'red');
+                recordBtn.textContent = '停止錄影';
+                recordBtn.className = 'w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200';
+
+                // Show recording timer
+                if (showTimerToggle.checked) {
+                    recordingTimer.classList.remove('hidden');
+                }
+
+                // Handle stream end
+                stream.getVideoTracks()[0].onended = () => {
+                    if (isRecording) {
+                        stopRecording();
+                    }
+                };
+
+            } catch (err) {
+                console.error('錄影失敗:', err);
+                updateStatus('錄影失敗', 'red');
+                setTimeout(() => updateStatus('準備就緒'), 3000);
+            }
+        }
+
+        // Stop recording
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            clearInterval(timerInterval);
+            timer.classList.add('hidden');
+            recordingTimer.classList.add('hidden');
+            updateStatus('處理中...', 'yellow');
+            recordBtn.textContent = '開始錄影';
+            recordBtn.className = 'w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105';
+            
+            setTimeout(() => updateStatus('準備就緒'), 2000);
+        }
+
+        // Start timer
+        function startTimer() {
+            timer.classList.remove('hidden');
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const seconds = (elapsed % 60).toString().padStart(2, '0');
+                const timeString = `${minutes}:${seconds}`;
+                timer.textContent = timeString;
+                recordingTimer.textContent = timeString;
+            }, 1000);
+        }
+
+        // Take screenshot
+        async function takeScreenshot() {
+            try {
+                updateStatus('請選擇要截圖的螢幕...', 'yellow');
+
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { mediaSource: 'screen' }
+                });
+
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+
+                video.onloadedmetadata = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+
+                    canvas.toBlob((blob) => {
+                        const filename = `screenshot-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+                        addImageToGallery(blob, filename);
+                        stream.getTracks().forEach(track => track.stop());
+                        updateStatus('截圖完成！', 'green');
+                        setTimeout(() => updateStatus('準備就緒'), 2000);
+                    }, 'image/png');
+                };
+            } catch (err) {
+                console.error('截圖失敗:', err);
+                updateStatus('截圖失敗', 'red');
+                setTimeout(() => updateStatus('準備就緒'), 3000);
+            }
+        }
+
+        // Add video to gallery
+        function addVideoToGallery(blob, filename) {
+            const gallery = mediaGallery;
+            
+            // Remove "no files" message
+            if (gallery.querySelector('.text-gray-400')) {
+                gallery.innerHTML = '';
+            }
+
+            const url = URL.createObjectURL(blob);
+            const fileSize = (blob.size / (1024 * 1024)).toFixed(2);
+            
+            const videoItem = document.createElement('div');
+            videoItem.className = 'bg-white/5 rounded-xl p-4 border border-white/10';
+            videoItem.innerHTML = `
+                <video class="video-preview w-full h-32 object-cover mb-3" controls>
+                    <source src="${url}" type="${blob.type}">
+                </video>
+                <div class="text-white font-medium text-sm mb-1">${filename}</div>
+                <div class="text-gray-400 text-xs mb-3">${fileSize} MB • ${new Date().toLocaleString('zh-TW')}</div>
+                <div class="flex gap-2">
+                    <button onclick="openPreview('${url}', 'video')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 px-3 rounded">
+                        🔍 預覽
+                    </button>
+                    <button onclick="downloadFromUrl('${url}', '${filename}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-2 px-3 rounded">
+                        ⬇️ 下載
+                    </button>
+                </div>
+            `;
+            
+            gallery.insertBefore(videoItem, gallery.firstChild);
+        }
+
+        // Add image to gallery
+        function addImageToGallery(blob, filename) {
+            const gallery = mediaGallery;
+            
+            // Remove "no files" message
+            if (gallery.querySelector('.text-gray-400')) {
+                gallery.innerHTML = '';
+            }
+
+            const url = URL.createObjectURL(blob);
+            const fileSize = (blob.size / (1024 * 1024)).toFixed(2);
+            
+            const imageItem = document.createElement('div');
+            imageItem.className = 'bg-white/5 rounded-xl p-4 border border-white/10';
+            imageItem.innerHTML = `
+                <img src="${url}" class="w-full h-32 object-cover rounded-lg mb-3" alt="Screenshot">
+                <div class="text-white font-medium text-sm mb-1">${filename}</div>
+                <div class="text-gray-400 text-xs mb-3">${fileSize} MB • ${new Date().toLocaleString('zh-TW')}</div>
+                <div class="flex gap-2">
+                    <button onclick="openPreview('${url}', 'image')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 px-3 rounded">
+                        🔍 預覽
+                    </button>
+                    <button onclick="downloadFromUrl('${url}', '${filename}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-2 px-3 rounded">
+                        ⬇️ 下載
+                    </button>
+                </div>
+            `;
+            
+            gallery.insertBefore(imageItem, gallery.firstChild);
+        }
+
+        // Open preview modal
+        function openPreview(url, type) {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            
+            const content = type === 'video' 
+                ? `<video controls class="max-w-full max-h-full"><source src="${url}"></video>`
+                : `<img src="${url}" class="max-w-full max-h-full">`;
+            
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold">媒體預覽</h3>
+                        <button onclick="this.closest('.modal-overlay').remove()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                    </div>
+                    <div class="text-center">
+                        ${content}
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+        }
+
+        // Download from URL
+        function downloadFromUrl(url, filename) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Download file (manual download only)
+        function downloadFile(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Event listeners
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                isRecording = true;
+                startScreenSelection();
+            } else {
+                stopRecording();
+            }
+        });
+
+        screenshotBtn.addEventListener('click', takeScreenshot);
+
+        // Check browser support
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            updateStatus('瀏覽器不支援', 'red');
+            recordBtn.disabled = true;
+            screenshotBtn.disabled = true;
+        }
+
+        // Make functions global for onclick handlers
+        window.openPreview = openPreview;
+        window.downloadFromUrl = downloadFromUrl;
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96e7001fc5ec8f1f',t:'MTc1NTA3NTQwMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
